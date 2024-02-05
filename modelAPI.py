@@ -1,13 +1,10 @@
 from glob import glob
-from keras.preprocessing.image import ImageDataGenerator
 import os
 import cv2
 import matplotlib.pyplot as plt
-import numpy as np 
+import numpy as np
 import pandas as pd
 import scipy
-import matplotlib.pyplot as plt
-from glob import glob
 from keras.callbacks import ModelCheckpoint
 from keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.utils import img_to_array, load_img
@@ -17,6 +14,12 @@ from keras.layers import Dense, GlobalAveragePooling2D
 from keras.applications.vgg16 import VGG16
 from keras.applications.vgg19 import VGG19
 from keras.applications.inception_v3 import InceptionV3
+from tensorflow.keras.applications import ResNet50
+from keras.applications import EfficientNetB0  # Import EfficientNetB0 from the efficientnet.keras module
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.models import Model
 
 import os
 import cv2
@@ -58,7 +61,65 @@ def thelayers(model):
     for i in model:
         print(i)
 
-def model_create(numberOfClass):
+
+def efficientnetb0_model_create(numberOfClass):
+    base_model = EfficientNetB0(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+    x = base_model.output
+    x = GlobalAveragePooling2D()(x)
+    x = Dense(1024, activation='relu')(x)
+    predictions = Dense(numberOfClass, activation='softmax')(x)
+
+    model = Model(inputs=base_model.input, outputs=predictions)
+    
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    return model
+
+def resnet50_model_create(number_of_classes):
+    base_model = ResNet50(include_top=False, input_shape=(224, 224, 3))
+
+    for layer in base_model.layers:
+        layer.trainable = False
+
+
+    x = base_model.output
+
+    x = Flatten()(x)
+
+    x = Dense(512, activation='relu')(x)
+    x = Dense(512, activation='relu')(x)
+    x = Dense(256, activation='relu')(x)
+    x = Dense(256, activation='relu')(x)
+    x = Dense(128, activation='relu')(x)
+    x = Dense(128, activation='relu')(x)
+
+
+    predictions = Dense(number_of_classes, activation='softmax')(x)
+
+    model = Model(inputs=base_model.input, outputs=predictions)
+
+    model.summary()
+    return model
+
+def vgg19_model_create(numberOfClass):
+    vgg19 = VGG19()
+    vgg19_layer_list = vgg19.layers
+    
+    thelayers(vgg19_layer_list)
+
+    Model = Sequential()
+    for i in range(len(vgg19_layer_list)-1):
+        Model.add(vgg19_layer_list[i])
+    
+    for layers in Model.layers:
+        layers.trainable = False
+
+    Model.add(Dense(numberOfClass, activation = "softmax"))
+
+    Model.summary()
+    return Model
+
+def inceptionv3_model_create(numberOfClass):
     base_model = InceptionV3(weights='imagenet', include_top=False)
 
     # add a global spatial average pooling layer
@@ -91,7 +152,6 @@ def accuracy_plt(history):
     plt.legend()
     plt.show()
     
-
 def testing(image_path,model):
     img = load_img(image_path, target_size=(224, 224,3))
     img_array = img_to_array(img)
@@ -116,7 +176,6 @@ def mux(pred):
     elif index == 6:
         return "Wadi Rum",max(pred)
     
-
 def plot_result(path,mux_value):
     img = cv2.imread(path)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB) 
